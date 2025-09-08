@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # Backend API with integrated Multi-MCP server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mcp-proxy-backend
+    ports:
+      - "8001:8001"
+    environment:
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_DEPLOYMENT_ID=${AZURE_OPENAI_DEPLOYMENT_ID}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GRAFANA_API_KEY=${GRAFANA_API_KEY}
+      - DOCKER_ENV=true
+    volumes:
+      - ./backend/mcp.json:/app/mcp.json
+      # Share Docker socket for managing Docker-based MCP servers
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Access host services
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # Frontend UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mcp-proxy-frontend
+    ports:
+      - "3001:80"
+    environment:
+      - BACKEND_URL=http://backend:8001
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge

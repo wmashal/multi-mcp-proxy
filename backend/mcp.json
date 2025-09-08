@@ -1,0 +1,69 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem@latest",
+        "/app"
+      ],
+      "transport": "stdio",
+      "env": {},
+      "description": "File system operations MCP server"
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": [
+        "-y", 
+        "@modelcontextprotocol/server-brave-search@latest"
+      ],
+      "transport": "stdio",
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "description": "Web search using Brave Search API"
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github@latest"
+      ],
+      "transport": "stdio", 
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "description": "GitHub repository operations"
+    },
+    "grafana": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--name", "mcp-grafana",
+        "--network", "multi-mcp-proxy_mcp-network",
+        "-e", "GRAFANA_URL=http://host.docker.internal:3000",
+        "-e", "GRAFANA_API_KEY=${GRAFANA_API_KEY}",
+        "mcp/grafana",
+        "--transport", "stdio"
+      ],
+      "env": {},
+      "description": "Grafana dashboard and visualization management"
+    },
+    "prometheus": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--name", "mcp-prometheus",
+        "--network", "multi-mcp-proxy_mcp-network",
+        "-e", "PROMETHEUS_URL=http://host.docker.internal:9090",
+        "ghcr.io/pab1it0/prometheus-mcp-server:latest"
+      ],
+      "env": {},
+      "description": "Prometheus metrics querying and monitoring"
+    }
+  }
+}

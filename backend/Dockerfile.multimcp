@@ -1,0 +1,58 @@
+# Multi-MCP Dockerfile - Build from source
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies including Node.js and Docker CLI
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone the multi-mcp repository
+RUN git clone https://github.com/kfirtoledo/multi-mcp.git .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir aiohttp
+
+# Create startup script
+RUN echo '#!/bin/bash\n\
+python main.py --transport sse --config /app/mcp.json --host 0.0.0.0 --port 8081 &\n\
+python -m aiohttp.web -H 0.0.0.0 -P 8081 --app-factory "aiohttp.web:Application" &\n\
+wait' > /app/start.sh && chmod +x /app/start.sh
+
+# Create a simple health check endpoint inline
+RUN echo 'from aiohttp import web\n\
+async def health(request):\n\
+    return web.json_response({"status": "healthy"})\n\
+\n\
+def create_app():\n\
+    app = web.Application()\n\
+    app.router.add_get("/health", health)\n\
+    return app\n\
+\n\
+if __name__ == "__main__":\n\
+    app = create_app()\n\
+    web.run_app(app, host="0.0.0.0", port=8082)' > /app/health_app.py
+
+# Expose ports
+EXPOSE 8081 8082
+
+# Health check on port 8082
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8082/health || exit 1
+
+# Start both multi-mcp and health server
+CMD python main.py --transport sse --config /app/mcp.json --host 0.0.0.0 --port 8081 & \
+    python /app/health_app.py & \
+    wait
