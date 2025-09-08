@@ -795,30 +795,45 @@ async def get_servers():
         active_server_names = set()
 
     # Build server status list
-    for name, server_config in config.get("mcpServers", {}).items():
-        # Check if server has tools available (meaning it's connected)
-        server_tools = []
+    try:
+        available_tools = await proxy_manager.get_tools()
+        logger.info(f"Got {len(available_tools)} tools from Multi-MCP for server status")
         
-        try:
-            available_tools = await proxy_manager.get_tools()
-            # Filter tools for this server (if we can determine which server they come from)
-            for tool in available_tools:
-                if hasattr(tool, 'server_name') and tool.server_name == name:
-                    server_tools.append({
-                        "name": tool.name,
-                        "description": tool.description if hasattr(tool, 'description') else f"{tool.name} from {name} server"
-                    })
-                elif hasattr(tool, 'name') and name in proxy_manager.connected_servers:
-                    # Fallback: assume tools belong to connected servers
-                    server_tools.append({
-                        "name": tool.name,
-                        "description": tool.description if hasattr(tool, 'description') else f"{tool.name} from {name} server"
-                    })
-                    
-            status = "connected" if name in proxy_manager.connected_servers else "configured"
-        except Exception as e:
-            logger.error(f"Error getting tools for server {name}: {e}")
-            status = "configured"
+        # Map tools to servers based on naming patterns
+        tool_mapping = {
+            'filesystem': [],
+            'brave-search': [],
+            'github': [], 
+            'grafana': [],
+            'prometheus': []
+        }
+        
+        for tool in available_tools:
+            tool_name = tool.name if hasattr(tool, 'name') else str(tool)
+            tool_desc = tool.description if hasattr(tool, 'description') else f"Tool: {tool_name}"
+            
+            # Map tools to servers based on naming patterns
+            if tool_name.startswith('filesystem_'):
+                tool_mapping['filesystem'].append({"name": tool_name, "description": tool_desc})
+            elif tool_name.startswith('brave_search_') or 'brave' in tool_name.lower():
+                tool_mapping['brave-search'].append({"name": tool_name, "description": tool_desc})
+            elif tool_name.startswith('github_') or 'github' in tool_name.lower():
+                tool_mapping['github'].append({"name": tool_name, "description": tool_desc})
+            elif tool_name.startswith('grafana_') or 'grafana' in tool_name.lower():
+                tool_mapping['grafana'].append({"name": tool_name, "description": tool_desc})
+            elif tool_name.startswith('prometheus_') or 'prometheus' in tool_name.lower():
+                tool_mapping['prometheus'].append({"name": tool_name, "description": tool_desc})
+        
+    except Exception as e:
+        logger.error(f"Error getting tools for server status: {e}")
+        tool_mapping = {}
+    
+    for name, server_config in config.get("mcpServers", {}).items():
+        # Get tools for this server from our mapping
+        server_tools = tool_mapping.get(name, [])
+        
+        # Set status based on whether we have tools (indicating connection)
+        status = "connected" if server_tools else "configured"
 
         servers.append(
             ServerStatus(

@@ -194,6 +194,11 @@
             min-height: 400px;
             font-size: 14px;
             line-height: 1.5;
+            width: 100%;
+            box-sizing: border-box;
+            overflow-x: auto;
+            white-space: pre;
+            resize: both;
         }
 
          /* Chat Interface Styles */
@@ -605,15 +610,7 @@
                                      server.capabilities.tools ?
                                      server.capabilities.tools.length : 0;
 
-                    const toolsList = toolsCount > 0 && server.capabilities.tools ?
-                        `<div class="tool-list">
-                            <strong>Available Tools:</strong>
-                            <ul style="margin-left: 20px; margin-top: 5px;">
-                                ${server.capabilities.tools.map(tool =>
-                                    `<li title="${tool.description || 'No description'}">${tool.name}</li>`
-                                ).join('')}
-                            </ul>
-                        </div>` : '';
+                    // Remove detailed tools list as requested
 
                     return `
                     <div class="server-card">
@@ -634,7 +631,6 @@
                                     ${server.capabilities.prompts ? `<li>Prompts: ${server.capabilities.prompts.length}</li>` : ''}
                                 </ul>
                             </div>
-                            ${toolsList}
                         ` : ''}
                         <button class="btn btn-danger" onclick="removeServer('${server.name}')">Remove</button>
                     </div>
@@ -803,7 +799,17 @@
 
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            contentDiv.textContent = content;
+            
+            // Format content with basic markdown support and line breaks
+            const formattedContent = content
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code style="background: #f1f5f9; padding: 2px 4px; border-radius: 3px;">$1</code>')
+                .replace(/^(\d+\.)\s/gm, '<div style="margin-left: 15px;">$1 ')
+                .replace(/^(\-)\s/gm, '<div style="margin-left: 15px;">• ');
+            
+            contentDiv.innerHTML = formattedContent;
 
             const infoDiv = document.createElement('div');
             infoDiv.className = 'message-info';
